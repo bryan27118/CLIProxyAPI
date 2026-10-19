@@ -21,6 +21,29 @@ func TestWeightedRoundRobinRoutingSelector(t *testing.T) {
 	}
 }
 
+func TestSoonestResetRoutingSelector(t *testing.T) {
+	state := normalizedRoutingRuntimeState(&internalconfig.Config{
+		Routing: internalconfig.RoutingConfig{Strategy: "soonest-reset"},
+	})
+	if state.strategy != "soonest-reset" {
+		t.Fatalf("strategy = %q, want soonest-reset", state.strategy)
+	}
+	if _, ok := newRoutingSelector(state).(*coreauth.SoonestResetSelector); !ok {
+		t.Fatalf("selector type = %T, want *auth.SoonestResetSelector", newRoutingSelector(state))
+	}
+
+	state = normalizedRoutingRuntimeState(&internalconfig.Config{
+		Routing: internalconfig.RoutingConfig{Strategy: "soonest-reset", SessionAffinity: true},
+	})
+	selector := newRoutingSelector(state)
+	if _, ok := selector.(*coreauth.SessionAffinitySelector); !ok {
+		t.Fatalf("selector type = %T, want session affinity around soonest-reset", selector)
+	}
+	if stoppable, ok := selector.(interface{ Stop() }); ok {
+		stoppable.Stop()
+	}
+}
+
 func TestServiceRejectsInvalidCredentialWeightConfigCommit(t *testing.T) {
 	originalCfg := &internalconfig.Config{}
 	service := &Service{cfg: originalCfg}
