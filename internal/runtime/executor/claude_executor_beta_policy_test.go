@@ -524,6 +524,50 @@ func TestApplyClaudeHeaders_StructuredHelperBetaOrderPreservedWithAdvisor(t *tes
 	}
 }
 
+// Anthropic rejects a Thread continuation whose Anthropic-Beta differs from the
+// Thread's first request. The first request replays signed thinking blocks and
+// gets the binding (and its beta); a continuation carries only the new turn, so
+// it must get the same binding even though it has no blocks to replay.
+func TestApplyClaudeHeaders_ThreadTurnsShareTheBindingBeta(t *testing.T) {
+	incoming := http.Header{}
+	incoming.Set("Anthropic-Beta", claudeCodeBeta+",interleaved-thinking-2025-05-14,"+claudeEffortBeta+","+
+		claudeThinkingDisplayUpdatesBeta+",message-threads-2026-08-12")
+	thinking := `"thinking":{"type":"adaptive","display":"updates"}`
+	bodies := map[string]string{
+		"first create": `{"model":"claude-opus-5-5",` + thinking + `,"thread":{"type":"create"},` +
+			`"messages":[{"role":"user","content":"hi"}]}`,
+		"replayed create": `{"model":"claude-opus-5-5",` + thinking + `,"thread":{"type":"create"},` +
+			`"messages":[{"role":"user","content":"hi"},{"role":"assistant","content":[{"type":"thinking","thinking":"x","signature":"sig"},{"type":"text","text":"ok"}]},{"role":"user","content":"next"}]}`,
+		"continue": `{"model":"claude-opus-5-5",` + thinking + `,"thread":{"type":"continue","previous_message_id":"msg_1"},` +
+			`"messages":[{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"done"}]}]}`,
+	}
+	betas := map[string]string{}
+	for name, raw := range bodies {
+		body := applyClaudePreservedThinkingBinding([]byte(raw))
+		if got := gjson.GetBytes(body, "thinking.block_binding.prefix_mismatch_behavior").String(); got != "drop_block" {
+			t.Fatalf("%s: block_binding = %q, want drop_block on every Thread request", name, got)
+		}
+		req := newClaudeHeaderTestRequest(t, nil)
+		if err := applyClaudeHeaders(req, claudeOAuthAuthForBetaPolicy(), claudeRaceProbeOAuthKey, true, nil, body, nil, incoming, true); err != nil {
+			t.Fatalf("%s: applyClaudeHeaders() error = %v", name, err)
+		}
+		betas[name] = req.Header.Get("Anthropic-Beta")
+		if !strings.Contains(betas[name], claudeThinkingBindingBeta) {
+			t.Fatalf("%s: Anthropic-Beta = %q, want %s", name, betas[name], claudeThinkingBindingBeta)
+		}
+	}
+	if betas["continue"] != betas["replayed create"] || betas["continue"] != betas["first create"] {
+		t.Fatalf("Thread turns differ in Anthropic-Beta:\n first create    %s\n replayed create %s\n continue        %s",
+			betas["first create"], betas["replayed create"], betas["continue"])
+	}
+
+	// Outside a Thread, a body with no signed blocks keeps its thinking untouched.
+	plain := []byte(`{"model":"claude-opus-5-5",` + thinking + `,"messages":[{"role":"user","content":"hi"}]}`)
+	if got := applyClaudePreservedThinkingBinding(plain); gjson.GetBytes(got, "thinking.block_binding").Exists() {
+		t.Fatalf("non-Thread body without signed blocks got block_binding: %s", got)
+	}
+}
+
 // A body that carries thinking.block_binding is rejected upstream unless the
 // thinking-binding-controls beta travels with it, so even caller-owned
 // (default API-key) and confirmed-passthrough modes must emit that beta.

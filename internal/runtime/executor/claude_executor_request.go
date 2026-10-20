@@ -381,6 +381,12 @@ func claudeBodyHasSignedThinkingBlock(body []byte) bool {
 	return found
 }
 
+// claudeBodyUsesThread reports whether the request creates or continues a
+// server-side Thread (`thread: {"type": "create"|"continue", ...}`).
+func claudeBodyUsesThread(body []byte) bool {
+	return strings.TrimSpace(gjson.GetBytes(body, "thread.type").String()) != ""
+}
+
 // applyClaudePreservedThinkingBinding makes relayed or reshaped histories
 // survivable on preserved-thinking models: when the request replays signed
 // thinking blocks, default thinking.block_binding.prefix_mismatch_behavior to
@@ -393,6 +399,12 @@ func claudeBodyHasSignedThinkingBlock(body []byte) bool {
 // caller-supplied prefix_mismatch_behavior stay untouched. This must run before
 // user payload rules, which stay the final semantic barrier and may override or
 // filter the injected value.
+//
+// Every request of a server-side Thread gets the binding too, signed blocks or
+// not. The binding brings the thinking-binding-controls beta, and Anthropic
+// rejects a continuation whose Anthropic-Beta differs from the Thread's first
+// request; a continuation carries only the new turn, so it has no replayed
+// blocks to detect. Without replayed blocks the binding changes nothing.
 func applyClaudePreservedThinkingBinding(body []byte) []byte {
 	model := gjson.GetBytes(body, "model").String()
 	if len(body) == 0 || !isClaudePreservedThinkingModel(model) || claudeToolChoiceForcesToolUse(body) {
@@ -404,7 +416,7 @@ func applyClaudePreservedThinkingBinding(body []byte) []byte {
 			return body
 		}
 	}
-	if !claudeBodyHasSignedThinkingBlock(body) {
+	if !claudeBodyHasSignedThinkingBlock(body) && !claudeBodyUsesThread(body) {
 		return body
 	}
 	if !thinking.Exists() {
