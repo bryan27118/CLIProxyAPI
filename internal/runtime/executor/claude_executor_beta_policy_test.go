@@ -11,11 +11,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MoeForge/moego/ojson"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
-	"github.com/tidwall/gjson"
 )
 
 const claudeRaceProbeOAuthKey = "sk-ant-oat-beta-policy"
@@ -154,7 +154,7 @@ func TestClaudeExecutor_ContextManagementNeverLeaksToOtherUpstreams(t *testing.T
 	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude}); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := gjson.GetBytes(upstreamBody, "context_management"); got.Exists() {
+	if got := ojson.GetBytes(upstreamBody, "context_management"); got.Exists() {
 		t.Fatalf("non-Anthropic upstream received context_management = %s", got.Raw)
 	}
 }
@@ -544,7 +544,7 @@ func TestApplyClaudeHeaders_ThreadTurnsShareTheBindingBeta(t *testing.T) {
 	betas := map[string]string{}
 	for name, raw := range bodies {
 		body := applyClaudePreservedThinkingBinding([]byte(raw))
-		if got := gjson.GetBytes(body, "thinking.block_binding.prefix_mismatch_behavior").String(); got != "drop_block" {
+		if got := ojson.GetBytes(body, "thinking.block_binding.prefix_mismatch_behavior").String(); got != "drop_block" {
 			t.Fatalf("%s: block_binding = %q, want drop_block on every Thread request", name, got)
 		}
 		req := newClaudeHeaderTestRequest(t, nil)
@@ -563,7 +563,7 @@ func TestApplyClaudeHeaders_ThreadTurnsShareTheBindingBeta(t *testing.T) {
 
 	// Outside a Thread, a body with no signed blocks keeps its thinking untouched.
 	plain := []byte(`{"model":"claude-opus-5-5",` + thinking + `,"messages":[{"role":"user","content":"hi"}]}`)
-	if got := applyClaudePreservedThinkingBinding(plain); gjson.GetBytes(got, "thinking.block_binding").Exists() {
+	if got := applyClaudePreservedThinkingBinding(plain); ojson.GetBytes(got, "thinking.block_binding").Exists() {
 		t.Fatalf("non-Thread body without signed blocks got block_binding: %s", got)
 	}
 }
