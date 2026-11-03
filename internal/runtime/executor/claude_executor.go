@@ -134,7 +134,7 @@ func sanitizeClaudeMessagesForClaudeUpstreamDoc(doc *ojson.Doc, targetModel stri
 			partPath := fmt.Sprintf("messages.%d.content.%d", i, j)
 			partType := part.Get("type").String()
 			if partType == "tool_use" {
-				if stripClaudeToolUseProvenanceFieldsDoc(doc, partPath) {
+				if stripClaudeToolUseProvenanceFieldsDoc(doc, partPath, part) {
 					modified = true
 					report.DroppedSignatures++
 				}
@@ -206,7 +206,22 @@ func sanitizeClaudeMessagesForClaudeUpstreamDoc(doc *ojson.Doc, targetModel stri
 	return report, modified
 }
 
-func stripClaudeToolUseProvenanceFieldsDoc(doc *ojson.Doc, partPath string) bool {
+// claudeToolUseProvenanceKeys are the tool_use members that
+// stripClaudeToolUseProvenanceFieldsDoc can remove; extra_content covers its
+// nested google.thought_signature.
+var claudeToolUseProvenanceKeys = []string{"signature", "thoughtSignature", "thought_signature", "model", "extra_content"}
+
+// stripClaudeToolUseProvenanceFieldsDoc removes other providers' provenance
+// fields from the tool_use block at partPath. part is that block as read before
+// the caller's loop edited anything, so a block without any of
+// claudeToolUseProvenanceKeys is left as is without a lookup on doc: each
+// doc.Get by path scans from the start of the body while doc has no parse
+// tree, which made this quadratic in the conversation size (a 24 MB history
+// with 243 tool calls took 29 s).
+func stripClaudeToolUseProvenanceFieldsDoc(doc *ojson.Doc, partPath string, part ojson.Result) bool {
+	if !claudeToolUseHasProvenanceFields(part) {
+		return false
+	}
 	changed := false
 	for _, relPath := range []string{"signature", "thoughtSignature", "thought_signature", "extra_content.google.thought_signature", "model"} {
 		sigPath := partPath + "." + relPath
@@ -226,6 +241,15 @@ func stripClaudeToolUseProvenanceFieldsDoc(doc *ojson.Doc, partPath string) bool
 		}
 	}
 	return changed
+}
+
+func claudeToolUseHasProvenanceFields(part ojson.Result) bool {
+	for _, key := range claudeToolUseProvenanceKeys {
+		if part.Get(key).Exists() {
+			return true
+		}
+	}
+	return false
 }
 
 // sanitizeClaudeWebSearchDomains removes empty allowed_domains/blocked_domains
