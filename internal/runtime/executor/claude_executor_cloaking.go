@@ -388,6 +388,7 @@ func claudeBillingFingerprintMessageTextDoc(doc *ojson.Doc) string {
 }
 
 func claudeCCHFallbackBillingHeader(ctx context.Context, cfg *config.Config, payload []byte, entrypoint string) string {
+	cfg = helps.ClaudeModelFingerprintConfig(cfg, ojson.GetBytesNoCopy(payload, "model").String())
 	isProbeOrHelper := helps.IsClaudeProbeOrHelperRequest(payload)
 	prevReq, promptID := helps.ExtractClaudeBillingTags(payload)
 	if !isProbeOrHelper {
@@ -414,6 +415,9 @@ func claudeCCHFallbackBillingHeader(ctx context.Context, cfg *config.Config, pay
 }
 
 func claudeCCHFallbackBillingHeaderDoc(ctx context.Context, cfg *config.Config, doc *ojson.Doc, entrypoint string) string {
+	if doc != nil {
+		cfg = helps.ClaudeModelFingerprintConfig(cfg, doc.Get("model").String())
+	}
 	isProbeOrHelper := isClaudeProbeOrHelperRequestDoc(doc)
 	prevReq, promptID := extractClaudeBillingTagsDoc(doc)
 	if !isProbeOrHelper {
@@ -2567,6 +2571,7 @@ func applyCloakingInternalDoc(
 		}
 	}
 
+	cfg = helps.ClaudeModelFingerprintConfig(cfg, doc.Get("model").String())
 	billingVersion := helps.DefaultClaudeVersion(cfg)
 	workload := getWorkloadFromContext(ctx)
 

@@ -1193,6 +1193,12 @@ func applyClaudeHeadersWithNativeProfile(
 		sessionIDs = nil
 	}
 	applyCLIFingerprint := fp.ProfileClaudeCodeCLI || wirePolicy.Cloak
+	if applyCLIFingerprint && !confirmedClaudeCode {
+		cfg = helps.ClaudeModelFingerprintConfig(cfg, ojson.GetBytesNoCopy(body, "model").String())
+		if cfg != nil {
+			hd = cfg.ClaudeHeaderDefaults
+		}
+	}
 	preserveCallerFingerprint := !applyCLIFingerprint && !confirmedClaudeCode
 	useOAuthBetas := fp.UseOAuthBetas
 	isAnthropicBase := isAnthropicUpstreamURL(r.URL)
