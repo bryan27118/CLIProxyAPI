@@ -7,7 +7,7 @@ import (
 )
 
 func TestReconcileClaudeCloakDisplayAfterThinkingOverride(t *testing.T) {
-	for _, model := range []string{"claude-opus-5-5", "claude-sonnet-5", "claude-fable-5-1"} {
+	for _, model := range []string{"claude-opus-5-5", "claude-sonnet-5", "claude-fable-5-1", "claude-fable-5-2", "claude-mythos-5-2"} {
 		t.Run(model, func(t *testing.T) {
 			for _, tc := range []struct {
 				name     string
