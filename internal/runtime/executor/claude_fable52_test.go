@@ -67,3 +67,20 @@ func TestClaudeFable52ThreadAndProgress(t *testing.T) {
 		}
 	}
 }
+
+func TestClaudeFable52DefaultClientVersion(t *testing.T) {
+	for _, model := range []string{"claude-fable-5-2", "claude-mythos-5-2"} {
+		for _, stream := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/stream=%v", model, stream), func(t *testing.T) {
+				payload := []byte(`{"model":"` + model + `","max_tokens":32,"messages":[{"role":"user","content":"hi"}]}`)
+				body, headers := runClaudeExecutorCapture(t, nil, "always", stream, model, payload)
+				if got := headers.Get("User-Agent"); got != "claude-cli/2.1.321 (external, cli)" {
+					t.Fatalf("User-Agent = %q, want supported Fable 5.2 CLI version", got)
+				}
+				if billing := ojson.GetBytes(body, "system.0.text").String(); !strings.Contains(billing, "cc_version=2.1.321.") {
+					t.Fatalf("billing version does not match User-Agent: %s", billing)
+				}
+			})
+		}
+	}
+}
