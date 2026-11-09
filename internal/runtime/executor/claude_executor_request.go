@@ -147,7 +147,7 @@ func isManagedClaudeBeta(beta string) bool {
 //	 7 context-management-2025-06-27
 //	 8 prompt-caching-scope-2026-01-05
 //	 9 mid-conversation-system-2026-04-07  models accepting a role=system turn
-//	10 per-turn-control-2026-07-01        opus-5-5 and fable-5-1, or requested
+//	10 per-turn-control-2026-07-01        opus-5-5, fable-5-1, fable/mythos-5-2, or requested
 //	11 timing-2026-09-09                  per-turn timing body, or requested
 //	12 mid-conversation-tool-changes-2026-07-01  same models as mid-conversation-system
 //	13 inline-tools-2026-09-15            inline tool_addition blocks, or requested
@@ -337,19 +337,19 @@ func isClaudeFable51OnlyModel(model string) bool {
 // prefix fails binding validation unless the request opts into dropping them.
 // See https://platform.claude.com/docs/en/build-with-claude/preserved-thinking
 func isClaudePreservedThinkingModel(model string) bool {
-	return isClaudeOpus55Model(model) || isClaudeSonnet55Model(model) || isClaudeHaiku55Model(model) || isClaudeFable51OnlyModel(model)
+	return isClaudeOpus55Model(model) || isClaudeSonnet55Model(model) || isClaudeHaiku55Model(model) || isClaudeFable51OnlyModel(model) || helps.IsClaudeFable52Model(model)
 }
 
 // claudeThinkingTypeAcceptsBlockBinding reports whether the body's thinking
-// mode may carry block_binding on this model. Haiku 5.5 and Sonnet 5.5 accept
-// it only with adaptive thinking (disabled/between_tools return 400); the
-// other preserved-thinking models also accept manual enabled thinking.
+// mode may carry block_binding on this model. Haiku 5.5, Sonnet 5.5, and
+// Fable/Mythos 5.2 require adaptive thinking; the other preserved-thinking
+// models also accept manual enabled thinking.
 func claudeThinkingTypeAcceptsBlockBinding(model, thinkingType string) bool {
 	switch strings.ToLower(strings.TrimSpace(thinkingType)) {
 	case "adaptive":
 		return true
 	case "enabled":
-		return !isClaudeHaiku55Model(model) && !isClaudeSonnet55Model(model)
+		return !isClaudeHaiku55Model(model) && !isClaudeSonnet55Model(model) && !helps.IsClaudeFable52Model(model)
 	default:
 		return false
 	}
@@ -444,10 +444,10 @@ func applyClaudePreservedThinkingBindingDoc(doc *ojson.Doc) bool {
 	return doc.Set("thinking.block_binding.prefix_mismatch_behavior", "drop_block") == nil
 }
 
-// claudeModelUsesProgressDisplay reports the 2.1.280 interactive CLI models that
+// claudeModelUsesProgressDisplay reports the interactive CLI models that
 // send thinking.display=updates unless the caller already chose a display mode.
 func claudeModelUsesProgressDisplay(model string) bool {
-	return isClaudeOpus55Model(model) || isClaudeFable51Model(model) || isClaudeSonnet5Model(model) || isClaudeSonnet55Model(model)
+	return isClaudeOpus55Model(model) || isClaudeFable51Model(model) || helps.IsClaudeFable52Model(model) || isClaudeSonnet5Model(model) || isClaudeSonnet55Model(model)
 }
 
 // applyClaudeCloakThinkingDisplay fills the latest CLI display only when the
@@ -480,7 +480,7 @@ func applyClaudeCloakThinkingDisplayDoc(doc *ojson.Doc, callerOwned bool) bool {
 }
 
 func claudeModelHasPerTurnEffort(model string) bool {
-	return isClaudeOpus55Model(model) || strings.HasPrefix(claudeCanonicalModel(model), "claude-fable-5-1")
+	return isClaudeOpus55Model(model) || isClaudeFable51OnlyModel(model) || helps.IsClaudeFable52Model(model)
 }
 
 // claudeModelHasPerTurnTiming reports models whose catalog lists per_turn_timing.
