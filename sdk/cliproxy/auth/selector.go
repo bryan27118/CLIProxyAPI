@@ -825,7 +825,7 @@ func isAuthBlockedForModel(auth *Auth, model string, now time.Time) (bool, block
 	if auth == nil {
 		return true, blockReasonOther, time.Time{}
 	}
-	if auth.Disabled || auth.Status == StatusDisabled {
+	if auth.Disabled || auth.Status == StatusDisabled || claudeFreePlan(auth) {
 		return true, blockReasonDisabled, time.Time{}
 	}
 	if hasUnauthorizedAuthFailure(auth) {
@@ -974,7 +974,7 @@ func isAuthBlockedByQuotaOrAuthForModel(auth *Auth, model string, now time.Time)
 	if auth == nil {
 		return true
 	}
-	if auth.Disabled || auth.Status == StatusDisabled {
+	if auth.Disabled || auth.Status == StatusDisabled || claudeFreePlan(auth) {
 		return true
 	}
 	if hasUnauthorizedAuthFailure(auth) {
